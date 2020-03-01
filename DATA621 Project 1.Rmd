@@ -3,10 +3,6 @@ title: "Money Ball - Data 621 Project 1"
 author: "Jack Russo, Javern Wilson, Joseph Simone, Anthony Munoz, Paul Perez"
 date: "03-01-2020"
 output:
-  pdf_document:
-    df_print: tibble
-    toc: true
-    toc_depth: 2
   html_document:
     df_print: paged
     toc: true
@@ -15,6 +11,10 @@ output:
       smooth_scroll: true
     theme: yeti
     highlight: pygments
+  pdf_document:
+    df_print: tibble
+    toc: true
+    toc_depth: 2
 ---
 
 **Overview**
@@ -148,7 +148,7 @@ ggplot(out_df, aes(x = Item, y=Count, color = Item)) + geom_bar(stat="identity",
   theme_minimal() +  theme(text = element_text(size=8), axis.text.x = element_text(angle = 90, hjust = 1)) + theme(legend.position = "none")
 ```
 
-Results show that TEAM_FIELDING_E has the most outliers amongst the predictors ad target variable.
+Results show that TEAM_FIELDING_E has the most outliers amongst the predictors and target variable.
 
 ### Skewness in Data
 
@@ -689,6 +689,7 @@ imputed_moneyball_evaulated_df <- mice(moneyball_evaluation_data, m=5, maxit = 5
 imputed_moneyball_evaulated_df <- complete(imputed_moneyball_evaulated_df)
 ```
 
+Let's see the predicted wins for the teams based on the the model we chose.
 ```{r}
 eval_data <- predict(lm.train7, newdata = imputed_moneyball_evaulated_df, interval="prediction")
 write.csv(eval_data, "moneyball_preds.csv", row.names = F)
@@ -699,7 +700,7 @@ head(eval_data, 30)
 
 ## Appendix
 
-Predicted Runs: [Github](https://github.com/javernw/DATA621-Business-Analytics-and-Data-Mining/blob/master/moneyball_preds.csv)
+Predicted Wins: [Github](https://github.com/javernw/DATA621-Business-Analytics-and-Data-Mining/blob/master/moneyball_preds.csv)
 
 R Source Code: [Github](https://github.com/javernw/DATA621-Business-Analytics-and-Data-Mining/blob/master/DATA621%20Project%201.Rmd)
 
