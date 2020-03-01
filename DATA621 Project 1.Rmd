@@ -26,6 +26,7 @@ In this homework assignment, we will explore, analyze and model a data set conta
 #opts_chunk$set(echo=FALSE)
 ```
 
+
 ```{r message=FALSE, warning=FALSE}
 library(tidyverse)
 library(gridExtra)
@@ -450,13 +451,13 @@ head(imputed_train_data, 10)
 ```
 
 Visual of complete dataset
-```{r}
+```{r, fig.align = 'center'}
 Amelia::missmap(imputed_train_data)
 ```
 
 The dataset now consist of only complete rows where each missing value is replaced via  the predictive mean method.
 
-```{r}
+```{r, fig.align = 'center'}
 densityplot(temp)
 ```
 
@@ -464,7 +465,7 @@ The imputed points are red and the obserced are blue. The matching shape of each
 
 
 The Stripplot shows where the missing values were imputed based on the variables.
-```{r}
+```{r, fig.align = 'center'}
 stripplot(temp, pch = 20, cex = 1.2)
 ```
 
@@ -702,4 +703,4 @@ Predicted Runs: [Github](https://github.com/javernw/DATA621-Business-Analytics-a
 
 R Source Code: [Github](https://github.com/javernw/DATA621-Business-Analytics-and-Data-Mining/blob/master/DATA621%20Project%201.Rmd)
 
-
+PDF: [Github](https://github.com/javernw/DATA621-Business-Analytics-and-Data-Mining/blob/master/DATA621-Project-1.pdf)
