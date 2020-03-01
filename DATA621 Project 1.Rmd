@@ -3,6 +3,10 @@ title: "Money Ball - Data 621 Project 1"
 author: "Jack Russo, Javern Wilson, Joseph Simone, Anthony Munoz, Paul Perez"
 date: "03-01-2020"
 output:
+  pdf_document:
+    df_print: tibble
+    toc: true
+    toc_depth: 2
   html_document:
     df_print: paged
     toc: true
@@ -11,10 +15,6 @@ output:
       smooth_scroll: true
     theme: yeti
     highlight: pygments
-  pdf_document:
-    df_print: tibble
-    toc: true
-    toc_depth: 2
 ---
 
 **Overview**
@@ -22,7 +22,20 @@ output:
 In this homework assignment, we will explore, analyze and model a data set containing approximately 2200 records. This analysis attempts to predict the number of wins for the teams. Each record represents a professional baseball team from the years 1871 to 2006 inclusive. Each record has the performance of the team for the given year, with all of the statistics adjusted to match the performance of a 162 game season.
 
 ```{r include = FALSE}
-#knitr::opts_chunk$set(echo=FALSE)
+library(knitr)
+opts_chunk$set(echo=FALSE)
+
+hook_output = knit_hooks$get('output')
+knit_hooks$set(output = function(x, options) {
+  # this hook is used only when the linewidth option is not NULL
+  if (!is.null(n <- options$linewidth)) {
+    x = knitr:::split_lines(x)
+    # any lines wider than n should be wrapped
+    if (any(nchar(x) > n)) x = strwrap(x, width = n)
+    x = paste(x, collapse = '\n')
+  }
+  hook_output(x, options)
+})
 ```
 
 
@@ -695,8 +708,11 @@ head(eval_data, 30)
 
 ```
 
+
 ## Appendix
 
-Rcode: [Github]()
+Predicted Runs: [Github](https://github.com/javernw/DATA621-Business-Analytics-and-Data-Mining/blob/master/moneyball_preds.csv)
 
-Predicted Runs: [Github]()
+R Source Code: [Github](https://github.com/javernw/DATA621-Business-Analytics-and-Data-Mining/blob/master/DATA621%20Project%201.Rmd)
+
+
