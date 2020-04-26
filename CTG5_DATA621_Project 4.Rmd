@@ -1,0 +1,868 @@
+---
+title: "DATA621 Homework 4"
+author: "Javern Wilson, Joseph Simone"
+date: "4/12/2020"
+output:
+  html_document:
+    df_print: paged
+    highlight: pygments
+    theme: yeti
+    toc: yes
+    toc_float:
+      collapsed: yes
+      smooth_scroll: yes
+  pdf_document:
+    toc: yes
+---
+
+
+**Overview** 
+
+In this homework assignment, we will explore, analyze and model a data set containing approximately 8000 records representing a customer at an auto insurance company. Each record has two response variables. The first response variable, `TARGET_FLAG`, is a `1` or a `0`. A “**1**” means that the person was in a car crash. A "**0**" means that the person was not in a car crash. The second response variable is `TARGET_AMT`. This value is zero if the person did not crash their car. But if they did crash their car, this number will be a value greater than zero. 
+ 
+Our objective is to build multiple linear regression and binary logistic regression models on the training data to predict the probability that a person will crash their car and also the amount of money it will cost if the person does crash their car. Only variables given in the project will be used unless new variables are derived from the original variables. Below is a short description of the variables of interest in the data set: 
+
+
++ `INDEX`    Identification Variable (do not use) 
+  - **EFFECT**: None 
+
++ `TARGET_FLAG` Was Car in a crash? 1=YES 0=NO  
+  - **EFFECT**: None 
+
++ `TARGET_AMT` If car was in a crash, what was the cost 
+  - **EFFECT**: None 
+
++ `AGE` Age of Driver 
+  - **EFFECT**: Very young people tend to be risky. Maybe very old people also. 
+
++ `BLUEBOOK` Value of Vehicle 
+  - **EFFECT**: Unknown effect on probability of collision, but probably effect the payout if there is a crash 
+
++ `CAR_AGE` Vehicle Age 
+  - **EFFECT**: Unknown effect on probability of collision, but probably effect the payout if there is a crash
+
++ `CAR_TYPE` Type of Car 
+  - **EFFECT**: Unknown effect on probability of collision, but probably effect the payout if there is a crash
+
++ `CAR_USE` Vehicle Use 
+  - **EFFECT**: Commercial vehicles are driven more, so might increase probability of collision 
+
++ `CLM_FREQ` # Claims (Past 5 Years) 
+  - **EFFECT**: The more claims you filed in the past, the more you are likely to file in the future 
+  
++ `EDUCATION` Max Education Level 
+  - **EFFECT**: Unknown effect, but in theory more educated people tend to drive more safely
+
++ `HOMEKIDS` # Children at Home 
+  - **EFFECT**: Unknown effect 
+
++ `HOME_VAL` Home Value 
+  - **EFFECT**: In theory, home owners tend to drive more responsibly 
+  
++ `INCOME` Income 
+  - **EFFECT**: In theory, rich people tend to get into fewer crashes 
+  
++ `JOB` Job Category 
+  - **EFFECT**: In theory, white collar jobs tend to be safer
+  
++ `KIDSDRIV` # Driving Children 
+  - **EFFECT**: When teenagers drive your car, you are more likely to get into crashes 
+  
++ `MSTATUS` Marital Status 
+  - **EFFECT**: In theory, married people drive more safely 
+  
++ `MVR_PTS` Motor Vehicle Record Points 
+  - **EFFECT**: If you get lots of traffic tickets, you tend to get into more crashes 
+  
++ `OLDCLAIM` Total Claims (Past 5 Years) 
+  - **EFFECT**: If your total payout over the past five years was high, this suggests future payouts will be high 
+  
++ `PARENT1` Single Parent 
+  - **EFFECT**: Unknown effect 
+  
++ `RED_CAR` A Red Car 
+  - **EFFECT**: Urban legend says that red cars (especially red sports cars) are more risky. Is that true? 
+  
++ `REVOKED` License Revoked (Past 7 Years) 
+  - **EFFECT**: If your license was revoked in the past 7 years, you probably are a more risky driver. 
+  
++ `SEX` Gender 
+  - **EFFECT**: Urban legend says that women have less crashes then men. Is that true? 
+  
++ `TIF` Time in Force 
+  - **EFFECT**: People who have been customers for a long time are usually more safe.
+  
++ `TRAVTIME` Distance to Work 
+  - Long drives to work usually suggest greater risk 
+  
++ `URBANICITY` Home/Work Area 
+  - **EFFECT**: Unknown 
+  
++ `YOJ` Years on Job 
+  - **EFFECT**: People who stay at a job for a long time are usually more safe 
+
+
+```{r include = FALSE}
+knitr::opts_chunk$set(echo=FALSE)
+```
+
+
+```{r message=FALSE, warning=FALSE}
+library(tidyverse)
+library(caret)
+library(e1071)
+library(pracma)
+library(pROC)
+library(psych)
+library(kableExtra)
+library(Hmisc)
+library(VIF)
+library(FactoMineR)
+library(corrplot)
+library(purrr)
+library(dplyr)
+library(MASS)
+library(mice)
+```
+
+
+
+```{r}
+insurance_train <- read.csv("https://raw.githubusercontent.com/javernw/DATA621-Business-Analytics-and-Data-Mining/master/insurance_training_data.csv")
+insurance_eval <- read.csv("https://raw.githubusercontent.com/javernw/DATA621-Business-Analytics-and-Data-Mining/master/insurance-evaluation-data.csv")
+columns <- colnames(insurance_train)
+target <- "TARGET_FLAG"
+inputs <- columns[!columns %in% c(target,"INDEX")]
+```
+
+### Preview
+```{r}
+insurance_train %>%  tibble(head(10))
+```
+
+## DATA EXPLORATION
+
+Structure
+```{r}
+glimpse(insurance_train)
+
+summary(insurance_train)
+```
+
+We have some missing values in the training set. Especially variables such as `CAR_AGE`. We will illustrate a graphical view was we move forward.
+
+### Targets
+
+#### How many were in a car crash?
+```{r}
+tf <- table(insurance_train$TARGET_FLAG) %>% data.frame()
+ggplot(tf, aes(x = Var1, y = Freq, fill = Var1)) + geom_bar(stat = "identity") + scale_fill_manual(name = "Crash?", labels = c("No", "Yes"),values=c("darkgreen", "#CC0000")) + geom_text(aes(label=Freq), vjust=1.6, color="white", size=3.5) + ggtitle("How many were in a crash?")
+
+```
+
+We can obviously see that majority of the observations (`73.6`%) in the trainig set were not involved in an accident.
+
+#### What was the cost?
+
+```{r}
+ggplot(insurance_train, aes(x=TARGET_AMT)) + geom_histogram(color="darkblue", fill="lightblue") + geom_vline(aes(xintercept=mean(TARGET_AMT)), color="blue", linetype="dashed", size=1)
+```
+
+### Accidents vs Gender
+
+#### Who crashes more? Men or Women?
+```{r}
+mvw <- insurance_train %>% dplyr::select(SEX, TARGET_FLAG) %>% count(SEX, TARGET_FLAG) %>% filter(TARGET_FLAG == 1)
+
+ggplot(mvw, aes(x = SEX, y = n, fill = SEX)) + geom_bar(stat = "identity") + scale_fill_manual(values=c("blue", "#CC0066")) + geom_text(aes(label=n), vjust=1.6, color="white", size=3.5) + ggtitle("Who crashes more: Men or Women?")
+```
+
+### Vehicle VS Accidents
+
+####Are Red Sport Cars more risky?
+
+```{r}
+red_cars <- table(insurance_train$RED_CAR) %>% data.frame()
+ggplot(red_cars, aes(x = Var1, y = Freq, fill = Var1)) + geom_bar(stat = "identity") + scale_fill_manual(name = "Outcome", values=c("darkgreen", "#CC0000")) + geom_text(aes(label=Freq), vjust=1.6, color="white", size=3.5) + ggtitle("Red Sport Cars More Risky?")
+```
+
+#### Type of vehicle with most accidents
+```{r}
+ insurance_train %>% dplyr::select(CAR_TYPE, TARGET_FLAG) %>% 
+  count(CAR_TYPE, TARGET_FLAG) %>% 
+  filter(TARGET_FLAG == 1) %>% 
+  ggplot(aes(x = CAR_TYPE, y = n, fill = CAR_TYPE)) +
+  geom_bar(stat = "identity") + 
+  geom_text(aes(label=n), vjust=1.6, color="white", size=3.5) + 
+  ggtitle("Which Vehicle Type Crashed The Most?")
+```
+
+### DISTRIBUTION OF AGE
+
+```{r}
+age_crash <- insurance_train %>% dplyr::select(AGE, TARGET_FLAG) %>% 
+  count(AGE, TARGET_FLAG) %>% 
+  filter(TARGET_FLAG == 1) %>% ggplot(aes(x = AGE, y = n)) + geom_bar(stat = "identity") + labs(title = "Age of persons involved in Accidents")
+  
+age_no_crash <- insurance_train %>% dplyr::select(AGE, TARGET_FLAG) %>% 
+  count(AGE, TARGET_FLAG) %>% 
+  filter(TARGET_FLAG == 0) %>%  ggplot(aes(x = AGE, y = n)) + geom_bar(stat = "identity") + labs(title = "Age of persons not involved in Accidents")
+  
+
+gridExtra::grid.arrange(age_crash, age_no_crash, nrow = 2)
+```
+
+Inferences: 
+
++ There is a more normal distribution of age range for those involved in accidents than with those who were not. 
+
++ In the second plot it shows as people get older, they become more responsible with driving. Frequencies are higher.
+
++ Younger folks become involved in accidents accodring to the first histogram.
+
+
+### Customers
+
+Who are more responsible?
+
+```{r, fig.width= 9, fig.height=6}
+library(viridis)
+tif <- insurance_train %>%
+  dplyr::select(TARGET_FLAG, TIF) %>% 
+  count(TARGET_FLAG, TIF) %>% 
+  ggplot(aes(x = TARGET_FLAG, y = n, fill = TIF)) + 
+  geom_bar(position = position_dodge(), stat = "identity") + 
+  scale_fill_viridis(discrete = F) +
+  geom_text(aes(label=n), vjust=1.6, 
+            color="white", size=3.5) + 
+  ggtitle("Are Long Time Customers more Responsible?")
+tif
+
+```
+
+This confirms the asumption made earlier when introducing the variables. Customers who are with the company tend to be more responsible with driving.
+
+
+### MISSING VALUES
+
+Before we check for missing values, some of the variables that should be as numeric and are classified as charactor variables need to be changed. Some charactors will be removed from the affected columns to convert values to numeric nature. This way the missing values visualization will be more accurate.
+
+```{r}
+insurance_train$INCOME  <- gsub( "\\$", "", insurance_train$INCOME)
+insurance_train$INCOME  <- gsub( "\\,", "", insurance_train$INCOME)
+insurance_train$INCOME  <- as.numeric(insurance_train$INCOME)
+
+insurance_train$HOME_VAL  <- gsub( "\\$", "", insurance_train$HOME_VAL)
+insurance_train$HOME_VAL  <- gsub( "\\,", "", insurance_train$HOME_VAL)
+insurance_train$HOME_VAL  <- as.numeric(insurance_train$HOME_VAL)
+
+insurance_train$BLUEBOOK  <- gsub( "\\$", "", insurance_train$BLUEBOOK)
+insurance_train$BLUEBOOK  <- gsub( "\\,", "", insurance_train$BLUEBOOK)
+insurance_train$BLUEBOOK  <- as.numeric(insurance_train$BLUEBOOK)
+
+insurance_train$OLDCLAIM  <- gsub( "\\$", "", insurance_train$OLDCLAIM)
+insurance_train$OLDCLAIM  <- gsub( "\\,", "", insurance_train$OLDCLAIM)
+insurance_train$OLDCLAIM  <- as.numeric(insurance_train$OLDCLAIM)
+
+```
+
+
+```{r}
+Amelia::missmap(insurance_train, col = c("orange", "brown"))
+```
+
+Only four variables have missing values. The missing values ratio is clearly insignificant as the report shows `1`% missing values.
+
+
+### Correlation
+
+#### Numeric Predictors VS Both Targets
+
+```{r, fig.width= 9, fig.height= 7}
+num_pred <- dplyr::select_if(insurance_train, is.numeric)
+
+np_corr <- cor(num_pred, use = "na.or.complete")
+p_matrix <- rcorr(as.matrix(num_pred))
+
+col <- colorRampPalette(c("#BB4444", "#EE9988", "#FFFFFF", "#77AADD", "#4477AA"))
+corrplot(np_corr, method="color", col=col(200),  
+         type="upper", order="hclust", 
+         addCoef.col = "black", 
+         tl.col="black", tl.srt=45, 
+         p.mat = p_matrix$P, sig.level = 0.01, insig = "blank", 
+         diag=FALSE 
+         )
+```
+
+In this corrplot, only significant relationships are highlighted, that is, with a significance below `0.01`.
+From the results of the corrplot, for instance, the target variables have a significant, moderat3ely but positive relationship scored at `0.54`. There also some moderate correlation between the variables `INCOME` and `HOME_VAL` with `0.58`. We can watch out for this was we progress on.
+
+
+#### Non_numeric Predictors VS TARGET_FLAG
+
+```{r, fig.width=10, fig.height= 8}
+char_pred <- dplyr::select_if(insurance_train, is.factor)
+par(mfrow = c(4,3))
+boxplot(TARGET_FLAG~PARENT1, ylab="PARENT", xlab= "target", col="#CC6600", data = insurance_train)
+boxplot(TARGET_FLAG~MSTATUS, ylab="MARRIED", xlab= "target", col="#CC6600", data = insurance_train)
+boxplot(TARGET_FLAG~SEX, ylab="SEX", xlab= "target", col="#CC6600", data = insurance_train)
+boxplot(TARGET_FLAG~EDUCATION, ylab="EDUCATION", xlab= "target", col="#CC6600", data = insurance_train, las=2)
+boxplot(TARGET_FLAG~JOB, ylab="JOB", xlab= "target", col="#CC6600", data = insurance_train, las=2)
+boxplot(TARGET_FLAG~CAR_USE, ylab="CAR USAGE", xlab= "target", col="#CC6600", data = insurance_train)
+boxplot(TARGET_FLAG~CAR_TYPE, ylab=" CAR TYPE", xlab= "target", col="#CC6600", data = insurance_train, las=2)
+boxplot(TARGET_FLAG~RED_CAR, ylab="RED CAR", xlab= "target", col="#CC6600", data = insurance_train)
+boxplot(TARGET_FLAG~REVOKED, ylab="REVOKED", xlab= "target", col="#CC6600", data = insurance_train)
+boxplot(TARGET_FLAG~URBANICITY, ylab="URBAN", xlab= "target", col="#CC6600", data = insurance_train)
+```
+
+#### Non_numeric Predictors VS TARGET_AMT
+
+```{r, fig.width=12, fig.height= 10}
+par(mfrow = c(5,2))
+boxplot(TARGET_AMT~PARENT1, ylab="PARENT", xlab= "target", col="#CC6600", data = insurance_train)
+boxplot(TARGET_AMT~MSTATUS, ylab="MARRIED", xlab= "target", col="#CC6600", data = insurance_train)
+boxplot(TARGET_AMT~SEX, ylab="SEX", xlab= "target", col="#CC6600", data = insurance_train)
+boxplot(TARGET_AMT~EDUCATION, ylab="EDUCATION", xlab= "target", col="#CC6600", data = insurance_train)
+boxplot(TARGET_AMT~JOB, ylab="JOB", xlab= "target", col="#CC6600", data = insurance_train, las=2)
+boxplot(TARGET_AMT~CAR_USE, ylab="CAR USAGE", xlab= "target", col="#CC6600", data = insurance_train)
+boxplot(TARGET_AMT~CAR_TYPE, ylab=" CAR TYPE", xlab= "target", col="#CC6600", data = insurance_train)
+boxplot(TARGET_AMT~RED_CAR, ylab="RED CAR", xlab= "target", col="#CC6600", data = insurance_train)
+boxplot(TARGET_AMT~REVOKED, ylab="REVOKED", xlab= "target", col="#CC6600", data = insurance_train)
+boxplot(TARGET_AMT~URBANICITY, ylab="URBAN", xlab= "target", col="#CC6600", data = insurance_train)
+
+
+```
+
+
+## DATA PREPARATION
+
+
+### Handling Missing Values
+
+In this case, instead of just removing observations with missing values, we will impute the mean for each predictor variable except target variables.
+
+```{r}
+
+insurance_train$CAR_AGE <- replace(insurance_train$CAR_AGE, -3, 0)
+insurance_train$CAR_AGE[is.na(insurance_train$CAR_AGE)] <- mean(insurance_train$CAR_AGE, na.rm=TRUE)
+insurance_train$HOME_VAL[is.na(insurance_train$HOME_VAL)] <- mean(insurance_train$HOME_VAL, na.rm=TRUE)
+insurance_train$YOJ[is.na(insurance_train$YOJ)] <- mean(insurance_train$YOJ, na.rm=TRUE)
+insurance_train$INCOME[is.na(insurance_train$INCOME)] <- mean(insurance_train$INCOME, na.rm=TRUE)
+
+#insurance_train$CAR_AGE <- replace_na_mean(insurance_train$CAR_AGE)
+#insurance_train$HOME_VAL <- replace_na_mean(insurance_train$HOME_VAL)
+#insurance_train$YOJ <- replace_na_mean(insurance_train$YOJ)
+#insurance_train$INCOME <- replace_na_mean(insurance_train$INCOME)
+```
+
+Missingmapness for original dataset
+```{r}
+Amelia::missmap(insurance_train, col = c("orange", "brown"))
+```
+
+The variable `INDEX` from original dataset will also be removed as is it not relevant to prediction of the target variables.
+```{r}
+insurance_train <- insurance_train[,-1]
+```
+
+### Data Transformations
+
+After exploration of the data, we thought certain conversions were in order:
+
+ * Convert INCOME to numeric
+ * Convert PARENT1 to binary (1/0)
+ * Convert HOME_VAL to binary
+ * Convert MSTATUS to binary (1/0)
+ * Convert SEX to Flag (IS_MALE)
+ * Convert CAR_USE to binary (1/0)
+ * Convert BLUEBOOK to numeric
+  * Parse CAR_TYPE into: CAR_PANEL_TRUCK,CAR_PICKUP,CAR_SPORTS_CAR,CAR_VAN,CAR_SUV
+ * Convert RED_CAR to binary (1/0)
+ * Convert OLDCLAIM to numeric   
+ * Convert REVOKED to binary (1/0)
+ * Convert URBANICITY to binary (1/0)
+ 
+All binary variables will have suffixed of "_BIN"
+ 
+```{r}
+string_split<- function(y, z){
+  temp <- as.numeric(gsub("[\\$,]","", y))
+  if (!is.na(temp) && temp == 0 && z) { NA } else {temp}
+}
+```
+
+
+```{r}
+transformation <- function(value){
+  column_outputs<- c("TARGET_FLAG","TARGET_AMT","AGE", "YOJ", "CAR_AGE","KIDSDRIV","HOMEKIDS","TRAVTIME","TIF","CLM_FREQ","MVR_PTS")
+  
+  # Convert INCOME to numeric, replace 0 for NA
+  value['INCOME'] <- string_split(value['INCOME'],TRUE)
+  value['INCOME'] <- replace(value['INCOME'], is.na(value['INCOME']), 0)
+  column_outputs <- c(column_outputs,'INCOME')
+ 
+  # Convert PARENT1 to flag (1/0)
+  value['PARENT1_BIN'] <- if (value['PARENT1']=="Yes") {1} else {0}
+  column_outputs <- c(column_outputs,'PARENT1_BIN')
+ 
+  # Convert HOME_VAL to binary(1/0)
+  value['HOME_VAL_BIN'] <- if (is.na(string_split(value['HOME_VAL'],TRUE))) {1} else {0}
+  column_outputs <- c(column_outputs,'HOME_VAL_BIN')
+  
+  # Convert MSTATUS to binary  IS_SINGLE (1/0)
+  value['MSTATUS_BIN'] <- if (value['MSTATUS']=="z_No") {1} else {0}
+  column_outputs <- c(column_outputs,'MSTATUS_BIN')
+ 
+  # Convert SEX to binary (IS_MALE)
+  value['IS_MALE_BIN'] <- if (value['SEX']=="M") {1} else {0}
+  column_outputs <- c(column_outputs,'IS_MALE_BIN')
+
+  # Convert CAR_USE to binary (1/0)
+  value['IS_COMMERCIAL_BIN'] <- if (value['CAR_USE']=="Commercial") {1} else {0}
+  column_outputs <- c(column_outputs,'IS_COMMERCIAL_BIN')
+  
+  
+  # Convert BLUEBOOK to numeric
+  value['BLUEBOOK'] <- string_split(value['BLUEBOOK'],FALSE)
+  column_outputs <- c(column_outputs,'BLUEBOOK')
+
+  # Convert OLDCLAIM to numeric
+  value['OLDCLAIM'] <- string_split(value['OLDCLAIM'],TRUE)
+  value['OLDCLAIM'] <- replace(value['OLDCLAIM'], is.na(value['OLDCLAIM']), 0)
+  column_outputs <- c(column_outputs,'OLDCLAIM')
+   
+  # Breakout CAR_TYPE into: 
+  value['CAR_PANEL_TRUCK_BIN'] <- if (value['CAR_TYPE']=="Panel Truck") {1} else {0}
+  value['CAR_PICKUP_BIN'] <- if (value['CAR_TYPE']=="Pickup") {1} else {0}
+  value['CAR_SPORTS_CAR_BIN'] <- if (value['CAR_TYPE']=="Sports Car") {1} else {0}
+  value['CAR_VAN_BIN'] <- if (value['CAR_TYPE']=="Van") {1} else {0}
+  value['CAR_SUV_BIN'] <- if (value['CAR_TYPE']=="z_SUV") {1} else {0}
+  column_outputs <- c(column_outputs,'CAR_PANEL_TRUCK_BIN','CAR_PICKUP_BIN','CAR_SPORTS_CAR_BIN','CAR_VAN_BIN','CAR_SUV_BIN')
+  
+  # Convert RED_CAR to binary(1/0)
+ 
+  value['RED_CAR_BIN'] <- if (value['RED_CAR']=="yes") {1} else {0}
+  column_outputs <- c(column_outputs,'RED_CAR_BIN')
+  
+  # Convert REVOKED to bianry (1/0)
+  value['REVOKED_BIN'] <- if (value['REVOKED']=="Yes") {1} else {0}
+  column_outputs <- c(column_outputs,'REVOKED_BIN')
+  
+  # Convert URBANICITY to bunary (1/0)
+  value['IS_URBAN_BIN'] <- if (value['URBANICITY']=="Highly Urban/ Urban") {1} else {0}
+  column_outputs <- c(column_outputs,'IS_URBAN_BIN')
+  
+   
+  final <- as.numeric(value[column_outputs])
+  names(final) <- column_outputs
+  final
+}
+```
+
+
+```{r}
+# form dataframe by function
+transform_insurance_train<-data.frame(t(rbind(apply(insurance_train,1,transformation))))
+transform_insurance_eval<-data.frame(t(rbind(apply(insurance_eval,1,transformation))))
+
+columns <- colnames(transform_insurance_train)
+target_bin <- c("TARGET_FLAG")
+target_lm <- c("TARGET_AMT")
+target <- c(target_bin,target_lm)
+inputs_bin <- columns[grep("_BIN",columns)]
+inputs_num <- columns[!columns %in% c(target,"INDEX",inputs_bin)]
+inputs<- c(inputs_bin,inputs_num)
+
+```
+
+
+
+```{r}
+#temp <- mice(insurance_train[,-c(1,2)] ,m=5,maxit=50,meth='pmm',seed=500, printFlag = F)
+#temp <- complete(temp)
+#temp$TARGET_FLAG <- insurance_train$TARGET_FLAG
+#temp$TARGET_AMT <- insurance_train$TARGET_AMT
+#insurance_train <- temp
+```
+
+
+```{r}
+#boxcox_trans <- function(column) {
+#  new_column <- column ^ boxcoxfit(column[column > 0])$lambda
+#  return(new_column)
+#}
+```
+
+```{r}
+#transform_insurance_train$INCOME_BC <- boxcox_trans(transform_insurance_train$INCOME)
+#transform_insurance_train$BLUEBOOK_BC <- boxcox_trans(transform_insurance_train$BLUEBOOK)
+#transform_insurance_train$OLDCLAIM_BC <- boxcox_trans(transform_insurance_train$OLDCLAIM)
+```
+
+
+
+Missingness Map for the Transformed Dataset
+```{r}
+Amelia::missmap(transform_insurance_train, col = c("orange", "brown"))
+```
+
+
+
+## BUILD MODELS
+
+### LINEAR REGRESSION
+
+#### Model 1
+
+Raw Data
+```{r}
+lm_mod1 <- lm(TARGET_AMT ~., data = insurance_train[,-1])
+summary(lm_mod1)
+```
+
+A lot of the variables remain insignificant, however there is room for improvement. Let's run the same model with only significant varibales. 
+
+```{r}
+par(mfrow=c(2,2))
+plot(lm_mod1)
+```
+
+
+### Model 2
+
+```{r message=FALSE, warning=FALSE}
+#lm_mod2 <- lm(TARGET_AMT ~ KIDSDRIV + INCOME + PARENT1YES + MSTATUSz_No + SEXz_F + EDUCATIONBachelors + TRAVTIME + CAR_USEPrivate + TIF + CAR_TYPEPickup + #'CAR_TYPESports Car' + CAR_TYPEVan + CAR_TYPEz_SUV + CLM_FREQ + REVOKEDYes + MVR_PTS + 'URBANICITYz_Highly Rural/ Rural', data = amt_data)
+
+amt_data <- insurance_train[,-1]
+amt_data <- na.omit(amt_data) # missing values in character catergorical columns removed
+lm_mod2 <- lm(TARGET_AMT ~., data = amt_data)
+lm_mod2 <-  stepAIC(lm_mod2, trace = F)
+#lm_inter2 <- lm(TARGET_AMT ~ 1, data = amt_data)
+summary(lm_mod2)
+#summary(step(lm_inter2, direccion='both', scope = formula(lm_mod2), trace = F))
+
+```
+
+
+```{r}
+par(mfrow=c(2,2))
+plot(lm_mod2)
+```
+
+### LOGISITIC REGRESSION
+
+#### Model 1
+
+Raw Data
+```{r}
+flg_data <- transform_insurance_train[,-c(2)]
+log_mod1 <- glm(TARGET_FLAG ~., family = binomial, data = flg_data)
+summary(log_mod1)
+
+par(mfrow=c(2,2))
+plot(log_mod1)
+```
+
+The p-values here are really high. We can try to improve this classifcation model.
+
+#### Model 2
+
+Manually update model by only keeping the signifcant predictors in the first logistic model.
+```{r}
+log_mod2 <- glm(TARGET_FLAG ~. -AGE-YOJ-CAR_AGE-HOMEKIDS-IS_MALE_BIN-RED_CAR_BIN , family = binomial, data = flg_data)
+summary(log_mod2)
+
+par(mfrow=c(2,2))
+plot(log_mod2)
+```
+
+#### Model 3
+
+Using the step regression algorthim to pick an optimal logistic model for the data.
+
+```{r}
+log_mod3 <- stepAIC(log_mod1, trace = F)
+summary(log_mod3)
+
+par(mfrow=c(2,2))
+plot(log_mod3)
+```
+
+
+## SELECT MODELS
+
+### Selected Linear Model Evaluation
+
+
+
+```{r}
+anova(lm_mod1, lm_mod2, test = "Chisq")
+```
+
+Linear **Model** 2 is clearly an improvement over Linear Model 1 and will be the optimal model to fit our data under linear regression.
+
+
+### Selected Logistic Model Metrics
+
+ANOVA
+
+```{r}
+anova(log_mod1, log_mod2, log_mod3)
+```
+
+Due to **Model 3** having the lowest AIC score, this will be the optimal model used for classification in our data.
+
+### METRICS
+
+```{r}
+probabilities <- predict(log_mod3, flg_data, type = "response")
+predicted.classes <- ifelse(probabilities > 0.5, 1, 0)
+flg_data$pred.class <- predicted.classes
+table("Predictions" = flg_data$pred.class, "Actual" = flg_data$TARGET_FLAG)
+```
+
+
+#### ACCURACY
+
+Accuracy can be defined as the fraction of predicitons our model got right. Also known as the error rate, the accuracy rate makes no distinction about the type of error being made.
+
+$$\large \text{Accuracy} = \large \frac{TP+TN}{TP+FP+TN+FN}$$
+
+```{r}
+cl_accuracy <- function(df){
+  cm <- table("Predictions" = df$pred.class, "Actual" = df$TARGET_FLAG)
+  
+  TP <- cm[2,2]
+  TN <- cm[1,1]
+  FP <- cm[2,1]
+  FN <- cm[1,2]
+  
+  return((TP + TN)/(TP + FP + TN + FN))
+}
+```
+
+
+
+#### CLASSIFICATION ERROR RATE
+
+The Classification Error Rate calculates the number of incorrect predictions out of the total number of predictions in the dataset.
+
+$$\large \text{Classification Error Rate} = \large \frac{FP+FN}{TP+FP+TN+FN}$$
+
+```{r}
+cl_cer <- function(df){
+  cm <- table("Predictions" = df$pred.class, "Actual" = df$TARGET_FLAG)
+  
+  TP <- cm[2,2]
+  TN <- cm[1,1]
+  FP <- cm[2,1]
+  FN <- cm[1,2]
+  
+  return((FP + FN)/(TP + FP + TN + FN))
+}
+```
+
+
+
+#### PRECISION
+
+This is the positive value or the fraction of the positive predictions that are actually positive.
+
+$$\large \text{Precision} = \large \frac{TP}{TP+FP}$$
+
+
+```{r}
+cl_precision <- function(df){
+  cm <- table("Predictions" = df$pred.class, "Actual" = df$TARGET_FLAG)
+  
+  TP <- cm[2,2]
+  TN <- cm[1,1]
+  FP <- cm[2,1]
+  FN <- cm[1,2]
+  
+  return(TP/(TP + FP))
+}
+
+```
+
+
+#### SENSITIVITY
+
+The sensitivity is sometimes considered the true positive rate since it measures the accuracy in the event population.
+
+$$\large \text{Sensitivity} = \large \frac{TP}{TP+FN}$$
+
+```{r}
+cl_sensitivity <- function(df){
+  cm <- table("Predictions" = df$pred.class, "Actual" = df$TARGET_FLAG)
+  
+  TP <- cm[2,2]
+  TN <- cm[1,1]
+  FP <- cm[2,1]
+  FN <- cm[1,2]
+  
+  return((TP)/(TP + FN))
+}
+```
+
+
+#### SPECIFICITY
+
+This is the true negatitive rate or the proportion of negatives that are correctly identified.
+
+$$\large \text{Specificity} = \large \frac{TN}{TN+FP}$$
+
+```{r}
+cl_specificity<- function(df){
+  cm <- table("Predictions" = df$pred.class, "Actual" = df$TARGET_FLAG)
+   
+  TP <- cm[2,2]
+  TN <- cm[1,1]
+  FP <- cm[2,1]
+  FN <- cm[1,2]
+  
+  return((TN)/(TN + FP))
+}
+```
+
+
+#### F1 SCORE OF PREDICTIONS
+
+The F1 Score of Predictions measures the test’s accuracy, on a scale of 0 to 1 where a value of 1 is the most accurate and the value of 0 is the least accurate.
+
+$$\large \text{F1 Score} = \large \frac{2 * Precision*Sensitivity}{Precision + Sensitivity}$$
+
+```{r}
+cl_f1score <- function(df){
+  cm <- table("Predictions" = df$pred.class, "Actual" = df$TARGET_FLAG)
+   
+  TP <- cm[2,2]
+  TN <- cm[1,1]
+  FP <- cm[2,1]
+  FN <- cm[1,2]
+  
+  f1score <- (2 * cl_precision(df) * cl_sensitivity(df)) / (cl_precision(df) + cl_sensitivity(df))
+  return(f1score)
+}
+```
+
+
+##### F1 SCORE BOUNDS
+
+```{r}
+f1_score_function <- function(cl_precision, cl_sensitivity){
+  f1_score <- (2*cl_precision*cl_sensitivity)/(cl_precision+cl_sensitivity)
+  return (f1_score)
+}
+
+(f1_score_function(0, .5))
+
+(f1_score_function(1, 1))
+
+p <- runif(100, min = 0, max = 1)
+s <- runif(100, min = 0, max = 1)
+f <- (2*p*s)/(p+s)
+summary(f)
+```
+
+#### Results from Selected Classification model
+
+```{r}
+Metric <- c('Accuracy','Classification Error Rate', 'Precision', 'Sensitivity','Specificity', 'F1 Score')
+Score <- round(c(cl_accuracy(flg_data), cl_cer(flg_data), cl_precision (flg_data), cl_sensitivity(flg_data), cl_specificity(flg_data), cl_f1score(flg_data)),4)
+df_1 <- as.data.frame(cbind(Metric, Score))
+kable(df_1)
+```
+
+
+#### ROC CURVE
+
+Shows how the true positive rate against the false positive rate at various threshold settings.  The AUC (Area Under Curve) tells how much model is capable of distinguishing between classes. Higher the AUC is better, that is, how well the model is at predicting 0s as 0s and 1s as 1s.
+
+Creating an ROC Function
+```{r}
+ROC <- function(x, y){
+  x <- x[order(y, decreasing = TRUE)]
+ t_p_r <- cumsum(x) / sum(x)
+ f_p_r <- cumsum(!x) / sum(!x)
+  xy <- data.frame(t_p_r,f_p_r, x)
+  
+ f_p_r_df <- c(diff(xy$f_p_r), 0)
+ t_p_r_df <- c(diff(xy$t_p_r), 0)
+  A_U_C <- round(sum(xy$t_p_r *f_p_r_df) + sum(t_p_r_df *f_p_r_df)/2, 4)
+  
+  plot(xy$f_p_r, xy$t_p_r, type = "l",
+       main = "ROC Curve",
+       xlab = "False Postive Rate",
+       ylab = "True Positive Rate")
+  abline(a = 0, b = 1)
+  legend(.6, .4, A_U_C, title = "Area Under Curve")
+}
+```
+
+```{r}
+ROC1 <- ROC(flg_data$TARGET_FLAG, flg_data$pred.class)
+ROC1
+```
+
+```{r}
+roc.mod1 <- roc(flg_data$TARGET_FLAG, flg_data$pred.class)
+
+plot(roc.mod1, print.auc = TRUE , main = "pROC Model 1")
+```
+
+Based on the AUC the classification model performed at a satisfactory level with a score of `0.662`.
+
+### Predictions
+
+#### Linear Model
+
+```{r}
+insurance_eval$INCOME  <- gsub( "\\$", "", insurance_eval$INCOME)
+insurance_eval$INCOME  <- gsub( "\\,", "", insurance_eval$INCOME)
+insurance_eval$INCOME  <- as.numeric(insurance_eval$INCOME)
+
+insurance_eval$HOME_VAL  <- gsub( "\\$", "", insurance_eval$HOME_VAL)
+insurance_eval$HOME_VAL  <- gsub( "\\,", "", insurance_eval$HOME_VAL)
+insurance_eval$HOME_VAL  <- as.numeric(insurance_eval$HOME_VAL)
+
+insurance_eval$BLUEBOOK  <- gsub( "\\$", "", insurance_eval$BLUEBOOK)
+insurance_eval$BLUEBOOK  <- gsub( "\\,", "", insurance_eval$BLUEBOOK)
+insurance_eval$BLUEBOOK  <- as.numeric(insurance_eval$BLUEBOOK)
+
+insurance_eval$OLDCLAIM  <- gsub( "\\$", "", insurance_eval$OLDCLAIM)
+insurance_eval$OLDCLAIM  <- gsub( "\\,", "", insurance_eval$OLDCLAIM)
+insurance_eval$OLDCLAIM  <- as.numeric(insurance_eval$OLDCLAIM)
+
+eval_amt <- insurance_eval[,-c(1,2)]
+```
+
+
+```{r}
+eval_amt <- predict(lm_mod2, newdata = eval_amt, interval="prediction")
+insurance_eval$TARGET_AMT <- eval_amt[,1]
+
+```
+
+
+
+#### Logisitic Model
+
+```{r}
+prob <- predict(log_mod3, transform_insurance_eval[,-1], type='response')
+transform_insurance_eval$TARGET_FLAG <- ifelse(prob >= 0.50, 1, 0)
+```
+
+
+#### Final Test Data Result 
+
+[Full Test Set Here](https://github.com/javernw/DATA621-Business-Analytics-and-Data-Mining/blob/master/insurance_predictions.csv)
+```{r}
+insurance_eval$TARGET_FLAG <- transform_insurance_eval$TARGET_FLAG
+insurance_eval %>% head(10) %>% as.tibble()
+write.csv(insurance_eval, "insurance_predictions.csv", row.names = F)
+```
+
+
+
+Source code found on [GITHUB]()
