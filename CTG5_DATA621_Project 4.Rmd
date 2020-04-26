@@ -1,8 +1,10 @@
 ---
 title: "DATA621 Homework 4"
-author: "Javern Wilson, Joseph Simone"
-date: "4/12/2020"
+author: "Javern Wilson, Joseph Simone, Paul Perez, Jack Russo"
+date: "4/26/2020"
 output:
+  pdf_document:
+    toc: yes
   html_document:
     df_print: paged
     highlight: pygments
@@ -11,8 +13,6 @@ output:
     toc_float:
       collapsed: yes
       smooth_scroll: yes
-  pdf_document:
-    toc: yes
 ---
 
 
@@ -103,7 +103,7 @@ Our objective is to build multiple linear regression and binary logistic regress
 
 
 ```{r include = FALSE}
-knitr::opts_chunk$set(echo=FALSE)
+# knitr::opts_chunk$set(echo=FALSE)
 ```
 
 
@@ -612,7 +612,7 @@ anova(log_mod1, log_mod2, log_mod3)
 
 Due to **Model 3** having the lowest AIC score, this will be the optimal model used for classification in our data.
 
-### METRICS
+#### METRICS for selected classification model
 
 ```{r}
 probabilities <- predict(log_mod3, flg_data, type = "response")
@@ -865,4 +865,4 @@ write.csv(insurance_eval, "insurance_predictions.csv", row.names = F)
 
 
 
-Source code found on [GITHUB]()
+Source code found on [GITHUB](https://github.com/javernw/DATA621-Business-Analytics-and-Data-Mining/blob/master/CTG5_DATA621_Project%204.Rmd)
