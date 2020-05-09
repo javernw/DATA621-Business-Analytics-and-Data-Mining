@@ -1,0 +1,652 @@
+---
+title: "DATA621 Final Project: Credit Risk Analysis"
+author: "Javern Wilson"
+date: "5/22/2020"
+header-includes:
+    - \usepackage{setspace}\singlespacing
+output:
+  pdf_document:
+    toc: yes
+  html_document:
+    df_print: paged
+    highlight: pygments
+    theme: cerulean
+    toc: yes
+    toc_float:
+      collapsed: yes
+      smooth_scroll: yes
+---
+
+
+## Abstract
+
+The purpose of this paper is to provide researchers and readers a comprehensive review of scholarly research on credit risk analysis using various classification models to predict whether a customer may get approved for a loan based on the features of their background similar to what is in the dataset used. Credit risk is usually the result of whether to approve loans especially in financial institutions. It often refers to the uncertainty of whether clients can keep up with servicing loans which consequently can cause bank crisis if they do not. Tables, figures and illustrations of data and models are included to comprehensively assess the results and assumptions to be verified. Online research journals and texts books demonstrating the use of the models used were reviewed for proper use and reporting on these models. The illustrations of the models are applied to the dataset to test the research hypothesis. In addition to this, relationships between the independent variables and a dichotomous dependent variable are also explored. As a result, recommendations and conclusions are made based on the outcome of the models. 
+
+
+**Keywords**: credit risk, classification, evaluation, default, models
+
+
+## Introduction
+
+When evaluating the range of data available for analysis, the authors sought data that could provide insight into business decision making as it pertains to non-discrimination. The credit risk dataset enabled the authors to examine the relationship betweem loan approval and other factors such as credit history, gender or education. In general, building effective models of this sort is an important metric of "fairness". Stakeholders want business decisions to be consistent with the available data, not grounded in personal biases. However, consistent decision making may still factor traits like gender into model creation. To evaluate the degree to which factors has influenced the loan approval process  within the dataset, we shall construct an optimal logistic model where loan approval is measured against the other predictors provided in the credit risk dataset. The model's performance will then be measured based on the metrics used for classsification models when predicting a potential borrower's outcome for approval. 
+
+\newpage
+
+## Literature Review
+
+Generally commercial banks play an important role in economic development of a country as they are crticial to the country's performance. Banks facilitate payments and channel credits to households and businesses. Credit risk is the rise or fall of a company's net asset value which appears when the parties of an agreement are not able to fullfil that obligation. The largest source of credit risk in banking institutions arise from loans.
+
+There are many studies that evaluate that there is an association between the default behaviour of the borrower and certain characteristic of their backgrounds such as education, marital status, income and employment. Most researcher believe that education plays a huge role in predicting who will default or deemed high credit risk. Students who are successful in their studies tend to have lower default rates than those who do not. For instance, there was a study based on students in California where failure to complete the academic program for which they signed up for are one of the strongest predictors of credit risk among all types of students (Woo 2002). Usually it is poor academic performance that encourages a student to withdraw, therefore the cause of loan default (Volkwein and Cabrera 1998).
+
+As for employment,Woo found that the strongest post-school variable associated with default is filing for unemployment insurance. Borrowers who experienced unemployment showed an 83 percent increase in their probability of default over their original probability (Woo 2002). Nationally, borrowers indicate that the most important reasons for default are
+being unemployed (59 percent said this) and working at low wages (49 percent) (Volkwein et al. 1998).
+
+According to Woo, borrowers with high earnings after they leave school are less likely to default on a loan than those with low earnings. A lot of times this can happen when students or rather borrowers take out larger loans and enter low paying career jobs. However, the income predictor was not as strong as the employment predictor (Woo 2002).
+
+When it comes to the personal lives of borrowers in terms of martial status, being separated, divorced or widowed increases the probability over 7 percent by going into default. In addition, having kids increases the probability by 4.5 percent per child (Volkwein and Szelest 1995). Having dependent children when not married increases the default rates above 40 percent (Volkwein et al. 1998). 
+
+As for credit history, this plays a large role in the lender's decision to qualify a customer for a loan. It is the first thing lenders look at when assessing the potential borrower's credit history. One's credit history is like a financial track record that shows how well the individual or party manages credit and payments over time. The results may vary but all lenders like to see good payment history, low amounts of debts, no missed or late payments.
+
+
+## Methodology
+
+Research was gathered using secondary resources. The type of research method used in this study is that of quantitative techniques where the aim is to classify features, count them, and construct statistical models in an attempt to explain what is observed. In order for this research to be possible, the data was collected from an online database. In identifying sources for this research, multiple research papers were used.
+
+\newpage
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F)
+```
+
+## Experiments and Results
+
+```{r message=FALSE, warning=FALSE}
+library(tidyverse)
+library(car)
+library(caret)
+library(Amelia)
+library(gridExtra)
+library(kableExtra)
+library(MASS)
+library(corrplot)
+library(mice)
+library(car)
+library(caret)
+library(e1071)
+library(Hmisc)
+library(pROC)
+library(pander)
+```
+
+### Description of Dataset
+
+```{r}
+cred_train <- read.csv("https://raw.githubusercontent.com/javernw/DATA621-Business-Analytics-and-Data-Mining/master/Credit_Risk_Train_data.csv")
+cred_test <- read.csv("https://raw.githubusercontent.com/javernw/DATA621-Business-Analytics-and-Data-Mining/master/Credit_Risk_Validate_data.csv")
+cred_test <- cred_test[,-13]
+```
+
+
+<!-- + `loan_id` -->
+<!--   - Unique Loan ID -->
+<!-- + `gender`  -->
+<!--   - Male/ Female -->
+<!-- + marital_status  -->
+<!--   - Applicant married (Yes/No) -->
+<!-- + `dependents` -->
+<!--   - Number of dependents -->
+<!-- + `qualification` -->
+<!--   - Applicant Education (Graduate/ Under Graduate) -->
+<!-- + `is_self_employed` -->
+<!--   - Self employed (Yes/No) -->
+<!-- + `applicant_income` -->
+<!--   - Applicant income -->
+<!-- + `co_applicant_income` -->
+<!--   - Co-applicant income -->
+<!-- + `loan_amount` -->
+<!--   - Loan amount in thousands -->
+<!-- + `loan_amount_term` -->
+<!--   - Term of loan in months -->
+<!-- + `credit_history` -->
+<!--   - credit history meets guidelines -->
+<!-- + `property_area` -->
+<!--   - Urban/ Semi Urban/ Rural -->
+<!-- + `Loan_Status` -->
+<!--   - Approved(Y/N) -->
+
+In the dataset, there are 12 variables; 11 predictor variables and the dependent variable. Below is a summary showing the variables. The dependent variable is the `Loan_Status` which contains whether or not the potential borrower may get approved.
+  
+
+<!-- ##### Preview -->
+
+```{r}
+#kable(head(cred_train)) %>% kable_styling(bootstrap_options = c("striped", "hover", "responsive"))
+#tibble(head(cred_train))
+#pander(head(cred_train))
+```
+
+<!-- ##### Glimpse of what the data looks like -->
+
+<!-- ```{r} -->
+<!-- glimpse(cred_train) -->
+<!-- ``` -->
+
+##### Data Summary
+
+```{r}
+summary(cred_train)
+```
+
+<!-- ##### View of Missing data -->
+<!-- ```{r, fig.align='center'} -->
+<!-- missmap(cred_train, col = c("#CCCC00", "#660033")) -->
+<!-- ``` -->
+
+`Credit_History`, `LoanAmount` and `Loan_Amount_Term` had missing values. As we progressed along the project we worked on the missing data.
+
+\newpage
+
+##### Frequences for categorical variables
+
+```{r, fig.width=9, fig.height=8, fig.align= 'center'}
+par(mfrow = c(4, 2))
+
+barplot(table(cred_train$Gender),
+main="Gender",
+xlab="",
+ylab="Count",
+border="red",
+col="blue",
+density=10
+)
+
+barplot(table(cred_train$Married),
+main="Marriage",
+xlab="",
+ylab="Count",
+border="red",
+col="blue",
+density=10
+)
+
+barplot(table(cred_train$Dependents),
+main="Dependents",
+xlab="",
+ylab="Count",
+border="red",
+col="blue",
+density=10
+)
+
+barplot(table(cred_train$Education),
+main="Education",
+xlab="",
+ylab="Count",
+border="red",
+col="blue",
+density=10
+)
+
+barplot(table(cred_train$Self_Employed),
+main="Self Employed",
+xlab="",
+ylab="Count",
+border="red",
+col="blue",
+density=10
+)
+
+barplot(table(cred_train$Credit_History),
+main="Credit History",
+xlab="",
+ylab="Count",
+border="red",
+col="blue",
+density=10
+)
+
+barplot(table(cred_train$Property_Area),
+main="Property Area",
+xlab="",
+ylab="Count",
+border="red",
+col="blue",
+density=10
+)
+```
+
+From the plot above we can infer that majority of the persons observed in the dataset are Male, married, no kids, graduated, self employed, have credit history and lives in the semi-urban areas.
+
+\newpage
+
+##### Distribution for numeric variables
+
+```{r, fig.align='center'}
+hist.data.frame(cred_train[c(7, 8, 9, 10)])
+```
+
+1. The distributions are quite skewed. 
+
+2. Majority of the applicant does not make a lot of money and the Coapplicants make less. 
+
+3. The loan amount seems to usually be in the 100s. To confirm this, if you look at the summary earlier, you'll see that the median is at `128` (thousand).
+
+4. As far as the Loan Amount term is concerned, the terms averages up to 3 - 3.5 years.
+
+
+
+
+<!-- Lets have a closer look at the outliers. -->
+
+<!-- For numeric, non-categorical variables -->
+
+<!-- ```{r, fig.align='center'} -->
+<!-- num_boxplot <- cred_train %>% dplyr::select(ApplicantIncome, CoapplicantIncome, LoanAmount, Loan_Amount_Term) -->
+<!-- cred_outliers <- boxplot(num_boxplot, plot = F)$out -->
+<!-- out <- c(sum(num_boxplot$ApplicantIncome %in% cred_outliers), -->
+<!-- sum(num_boxplot$CoapplicantIncome%in% cred_outliers), -->
+<!-- sum(num_boxplot$LoanAmount %in% cred_outliers), -->
+<!-- sum(num_boxplot$Loan_Amount_Term %in% cred_outliers)) -->
+
+<!-- out_df <-data.frame(names(num_boxplot), out) -->
+<!-- colnames(out_df)<- c("Predictor", "Count") -->
+
+
+<!-- ggplot(out_df, aes(x = Predictor, y=Count, color = Predictor)) + geom_bar(stat="identity", fill = "black")+ -->
+<!--   geom_text(aes(label=Count), vjust=1.3, color = "lightgreen", size=3.5)+ -->
+<!--   theme_minimal() +  theme(text = element_text(size=8), axis.text.x = element_text(angle = 45, hjust = 1)) + theme(legend.position = "none") -->
+<!-- ``` -->
+
+<!-- The variable `Loan_Amount_Term` has the most outliers. People get loans for different reasons and therefore the loan terms will vary. -->
+
+\newpage
+
+#### Preprocessing Data
+
+<br/>
+
+First variable to be removed from the dataset is `Loan_ID` because it is unique and has no relevance to the target variable.
+```{r}
+cred_train <- cred_train[,-1]
+```
+All variables that are non-numeric are converted to numeric using multiclass or binary method.
+
+```{r}
+cred_train$Gender <- ifelse(cred_train$Gender == "Male", 1, 0)
+cred_train$Married <- ifelse(cred_train$Married == "Yes", 1, 0)
+levels(cred_train$Dependents)[5] <- 3
+cred_train$Education <- ifelse(cred_train$Education == "Graduate", 1, 0)
+cred_train$Self_Employed <- ifelse(cred_train$Self_Employed == "Yes", 1, 0)
+levels(cred_train$Property_Area)[1] <- 1 #rural
+levels(cred_train$Property_Area)[2] <- 2 #semi-urban
+levels(cred_train$Property_Area)[3] <- 3 #urban
+cred_train$Loan_Status <- ifelse(cred_train$Loan_Status == "Y", 1, 0)
+```
+
+For further exploraration, below is a boxplot of each numeric variable in the dataset clearly outlining any outliers present.
+
+```{r fig.align='center', message=FALSE, warning=FALSE}
+ggplot(stack(cred_train), aes(x = ind, y = values)) + 
+  geom_boxplot() +
+   theme(legend.position="none") +
+  theme(axis.text.x=element_text(angle=45, hjust=1)) + 
+  theme(panel.background = element_rect(fill = 'grey'))
+```
+
+\newpage 
+As we move forward, we look at correlations among the various predictors and the target variable.
+```{r, fig.width=9, fig.height=6, fig.align='center'}
+cred_train$Dependents <- as.numeric(as.character(cred_train$Dependents))
+cred_train$Property_Area <- as.numeric(as.character(cred_train$Property_Area))
+cred_corr <- cor(cred_train, use = "na.or.complete")
+
+p_matrix <- rcorr(as.matrix(cred_train))
+col <- colorRampPalette(c("#BB4444", "#EE9988", "#FFFFFF", "#77AADD", "#4477AA"))
+corrplot(cred_corr, method="color", col=col(200),  
+         type="upper", order="hclust", 
+         addCoef.col = "black", 
+         tl.col="black", tl.srt=45, 
+         p.mat = p_matrix$P, sig.level = 0.01, insig = "blank", 
+         diag=FALSE 
+         )
+
+
+```
+
+Only significant correlations are highlighted.
+For instance we can see some correlation between `LoanAmount` and `ApplicationIncome` at `0.57`. `Credit_History` is the only predictor that has a moderately positive relationship with the target `Loan_Status` at `0.53`. `Married` and `Gender` also somewhat have a relationship `0.32` that is positive.
+
+
+
+Earlier we saw the graph showing which variables had missing values. Before applying logistic regression model, we will do further analysis on missing values and outliers by imputation. To take care of this, the predictive mean will be imputed. In order to do this, the mice package is used.
+
+```{r include=FALSE}
+temp <- mice(cred_train,m=5,maxit=50,meth='pmm',seed=500, printFlag = F)
+temp <- complete(temp)
+temp$Loan_Status <- cred_train$Loan_Status
+cred_train <- temp
+
+cred_train$Dependents <- factor(cred_train$Dependents) # converted back to factor
+cred_train$Property_Area <- factor(cred_train$Property_Area) # converted back to factor
+Amelia::missmap(cred_train)
+```
+
+\newpage
+
+## Modeling
+
+Two models were build to determine which would be more optimal in predicting credit risk or chance of loan default of participants. The first model was built using all predictors in the dataset against the dependent variable. On the other hand, the second model was built using the stepwise regression algorithm to determine the best predictors.
+
+```{r include=FALSE}
+cred_mod1 <- glm(Loan_Status ~., family = binomial, data = cred_train)
+summary(cred_mod1)
+``` 
+
+When the first model was built, predictor variables such as dependents (2 or more), gender and self employed are not statistically significant. Keeping them in the model may contribute to overfitting. The *AIC* score was `575.33` on `599` degrees of freedom. There was room for the model to improve using statistical techniques, such as stepwise regression to eliminate them.  With this technique an optimal model was be generated with only the significant predictors. 
+
+<!-- Before we implement the stepwise regression technique, let us have a look at multicollinearity in the original model. -->
+
+<!-- ```{r} -->
+<!-- car::vif(cred_mod1) -->
+<!-- ``` -->
+
+<!-- There does not seem to be an multicollinearity as all the resulting values are below the threshold of 5.  -->
+
+<!-- #### Variable Importance for Model 1 -->
+<!-- ```{r} -->
+<!-- vi <- caret::varImp(cred_mod1) -->
+<!-- vi$X <- row.names(vi) -->
+<!-- row.names(vi) <- NULL -->
+<!-- vi <- vi[,c(2,1)] -->
+<!-- vi[order(vi$Overall, decreasing = T),] -->
+<!-- ``` -->
+
+#### Optimal Model
+```{r}
+cred_mod2 <- stepAIC(cred_mod1, trace = F)
+summary(cred_mod2)
+```
+
+The top 7 predictors generated from the second model are what were considered as important variables in the first model. The AIC did decrease therefore indicating that the model did improve a bit.
+
+##### Multicollinearity
+
+```{r}
+vif(cred_mod2)
+```
+
+There does not seem to be an multicollinearity as all the resulting values are below the threshold of 5.
+
+#### Variable Importance for Optimal Model
+```{r}
+vi2 <- caret::varImp(cred_mod2)
+vi2$X <- row.names(vi2)
+row.names(vi2) <- NULL
+vi2 <- vi2[,c(2,1)]
+vi2[order(vi2$Overall, decreasing = T),]
+```
+
+## Model Evaluation, Selection and Diagnostics
+
+Comparing first and second model,
+```{r}
+anova(cred_mod2, cred_mod1, test = "Chisq")
+```
+
+
+the results shows a non-significant result of (`p=0.7422`) against model one. Thus, we reject **model 1** and keep **model 2** as the optimal model going forward.
+
+#### Interpretation
+
+<br/>
+
+After using the stepwise regression function, we have `7` predictors remaining that are considered strong enough to predict whether or not a person can be approved for a loan. From the looks of the model, `Credit_History` with a positive coefficent of `3.975` has the most impact on the target variable while having the smallest p-value. This means that an increase a good credit history is associated with an increased chance of getting approved for a loan. This makes sense as lot of finance companies tend to look at your credit history to find out how responsible you are. On the other hand, with `LoanAmount` the coefficient is negative with `-0.001928`. This means that an increase in the amount of loan being requested by the borrower will be associated with a decrease in the probability of getting approved for a loan. This predictor definitely helps in the outcome of getting approved for a loan.  
+
+To confirm assumptions made about the model, the odds ratio may come in handy. Odds ratio is a statistic that quantifies the strength of the association or relationship between predictor and target variable. For example, based on the regression coefficient of `Credit_History`, a one unit increase will increase the odds of getting loan approved is `r round(exp(3.975 ), 2)` times.
+
+As mention earlier in the literature review, credit histoy plays a major role in determine who gets approved for a loan. It is the first thing the lender look at when assessing the potential buyer's qualification. With `Credit_History` being the most significant predictor, let's view the probability of being approved based on this predictor.
+
+```{r fig.align='center', message=FALSE, warning=FALSE}
+
+ggplot(cred_train, aes(x=Credit_History, y=Loan_Status)) + 
+  geom_point(alpha = 0.2) + 
+  geom_smooth(method="glm", method.args=list(family="binomial"), se=T) +  
+  labs(
+    title = "Logistic Regression Model", 
+    x = "Credit History",
+    y = "Probability Of Loan Being Approved"
+    )
+
+```
+
+When fitting the line to the points , a slight a S-shape curve is produced.
+
+\newpage
+
+## Metrics
+
+##### Confustion Matrix
+
+The confusion matrix describes the performance of the classifier. It is a table with four different combinations of predicted and actual values. It is extremely useful for measuring Recall, Precision, Specificity, Accuracy and most importantly AUC-ROC Curve. Below is the confusion matrix for the binary classifier.
+
+```{r}
+cred_train$cred.prob <- predict(cred_mod2, cred_train, type = "response")
+pred.class <- ifelse(cred_train$cred.prob > 0.5, 1, 0)
+cred_train$pred.class <- pred.class
+# table("Predictions" = cred_train$pred.class, "Actual" = cred_train$Loan_Status)
+```
+
+```{r}
+confusionMatrix(data=factor(cred_train$pred.class), reference = factor(cred_train$Loan_Status), positive = "1")
+```
+
+There are two possible predicted classes: "**1**"/ *yes* and "**0**"/ *no*. If we were predicting the presence of a disease, for example, "**1**" means the customer was approved for a loan, and "**0**" means the customer did not get approved for a loan.
+The classifier made a total of 614 predictions. Out of those 614 cases, the classifier predicted *yes* 422 times, and *no* 192 times.
+In reality, 519 potential borrowers in the sample were approved, and 95 were not.
+
+Let's dig further:
+
+1. Accuracy - 81.92 % of the time the model is correct.
+2. Sensitivity - 98.34% of the time when the model predicts yes, it is actually yes.
+3. Specificity - 45.83 % of the time when the model predicts no, it is actually a no.
+4. Prevalence - 68.73% of the sample predictions are classified as yes or approved.
+
+
+
+<!-- #### Metrics -->
+
+<!-- Custom functions were built to measure the performance of the logistic model. -->
+
+<!-- ##### ACCURACY -->
+
+<!-- $$\large \text{Accuracy} = \large \frac{TP+TN}{TP+FP+TN+FN}$$ -->
+
+
+<!-- Accuracy can be defined as the fraction of predicitons our model got right. Also known as the error rate, the accuracy rate makes no distinction about the type of error being made. -->
+
+<!-- ```{r} -->
+<!-- cl_accuracy <- function(df){ -->
+<!--   cm <- table("Predictions" = cred_train$pred.class, "Actual" = cred_train$Loan_Status) -->
+
+<!--   TP <- cm[2,2] -->
+<!--   TN <- cm[1,1] -->
+<!--   FP <- cm[2,1] -->
+<!--   FN <- cm[1,2] -->
+
+<!--   return((TP + TN)/(TP + FP + TN + FN)) -->
+<!-- } -->
+<!-- cl_accuracy(cred_train) -->
+<!-- ``` -->
+
+
+<!-- ##### CLASSIFICATION ERROR RATE -->
+
+<!-- $$\large \text{Classification Error Rate} = \large \frac{FP+FN}{TP+FP+TN+FN}$$ -->
+
+<!-- The Classification Error Rate calculates the number of incorrect predictions out of the total number of predictions in the dataset. -->
+
+<!-- ```{r} -->
+<!-- cl_cer <- function(df){ -->
+<!--   cm <-table("Predictions" = cred_train$pred.class, "Actual" = cred_train$Loan_Status) -->
+
+<!--   TP <- cm[2,2] -->
+<!--   TN <- cm[1,1] -->
+<!--   FP <- cm[2,1] -->
+<!--   FN <- cm[1,2] -->
+
+<!--   return((FP + FN)/(TP + FP + TN + FN)) -->
+<!-- } -->
+<!-- ``` -->
+
+<!-- ##### PRECISION -->
+
+<!-- $$\large \text{Precision} = \large \frac{TP}{TP+FP}$$ -->
+
+<!-- This is the positive value or the fraction of the positive predictions that are actually positive. -->
+
+<!-- ```{r} -->
+<!-- cl_precision <- function(df){ -->
+<!--   cm <- table("Predictions" = cred_train$pred.class, "Actual" = cred_train$Loan_Status) -->
+
+<!--   TP <- cm[2,2] -->
+<!--   TN <- cm[1,1] -->
+<!--   FP <- cm[2,1] -->
+<!--   FN <- cm[1,2] -->
+
+<!--   return(TP/(TP + FP)) -->
+<!-- } -->
+<!-- ``` -->
+
+<!-- ##### SENSITIVITY -->
+
+<!-- $$\large \text{Sensitivity} = \large \frac{TP}{TP+FN}$$ -->
+
+<!-- The sensitivity is sometimes considered the true positive rate since it measures the accuracy in the event population.  -->
+<!-- ```{r} -->
+<!-- cl_sensitivity <- function(df){ -->
+<!--   cm <- table("Predictions" = cred_train$pred.class, "Actual" = cred_train$Loan_Status) -->
+
+<!--   TP <- cm[2,2] -->
+<!--   TN <- cm[1,1] -->
+<!--   FP <- cm[2,1] -->
+<!--   FN <- cm[1,2] -->
+
+<!--   return((TP)/(TP + FN)) -->
+<!-- } -->
+<!-- cl_sensitivity(cred_train) -->
+<!-- ``` -->
+
+<!-- ##### SPECIFICITY -->
+
+<!-- $$\large \text{Specificity} = \large \frac{TN}{TN+FP}$$ -->
+
+<!-- This is the true negatitive rate or the proportion of negatives that are correctly identified. -->
+
+<!-- ```{r} -->
+<!-- cl_specificity<- function(df){ -->
+<!--   cm <- table("Predictions" = cred_train$pred.class, "Actual" = cred_train$Loan_Status) -->
+
+<!--   TP <- cm[2,2] -->
+<!--   TN <- cm[1,1] -->
+<!--   FP <- cm[2,1] -->
+<!--   FN <- cm[1,2] -->
+
+<!--   return((TN)/(TN + FP)) -->
+<!-- } -->
+<!-- ``` -->
+
+<!-- ##### F1 SCORE OF PREDICTIONS -->
+
+<!-- $$\large \text{F1 Score} = \large \frac{2 * Precision*Sensitivity}{Precision + Sensitivity}$$ -->
+
+<!-- The F1 Score of Predictions measures the test's accuracy, on a scale of 0 to 1 where a value of 1 is the most accurate and the value of 0 is the least accurate. -->
+
+<!-- ```{r} -->
+<!-- cl_f1score <- function(df){ -->
+<!--   cm <- table("Predictions" = cred_train$pred.class, "Actual" = cred_train$Loan_Status) -->
+
+<!--   TP <- cm[2,2] -->
+<!--   TN <- cm[1,1] -->
+<!--   FP <- cm[2,1] -->
+<!--   FN <- cm[1,2] -->
+
+<!--   f1score <- (2 * cl_precision(df) * cl_sensitivity(df)) / (cl_precision(df) + cl_sensitivity(df)) -->
+<!--   return(f1score) -->
+<!-- } -->
+<!-- ``` -->
+
+
+<!-- ```{r} -->
+<!-- Metric <- c('Accuracy','Classification Error Rate', 'Precision', 'Sensitivity','Specificity', 'F1 Score') -->
+<!-- Value <- round(c(cl_accuracy(class_output), cl_cer(class_output), cl_precision (class_output), cl_sensitivity(class_output), cl_specificity(class_output), cl_f1score(class_output)),4) -->
+<!-- df_1 <- as.data.frame(cbind(Metric, Value)) -->
+<!-- pander(df_1) -->
+<!-- ``` -->
+
+##### ROC CURVE
+
+Shows how the true positive rate against the false positive rate at various threshold settings. The AUC (Area Under Curve) tells how much model is capable of distinguishing between classes. Higher the AUC is better, that is, how well the model is at predicting 0s as 0s and 1s as 1s.
+
+```{r message=FALSE, warning=FALSE}
+plot(roc(cred_train$Loan_Status,cred_train$pred.class), print.auc = TRUE , main = "ROC by pROC")
+```
+
+The Area Under the Curve (AUC) is only at `0.721` which is acceptable.
+
+<!-- #### Test on test data -->
+
+```{r}
+cred_test <- cred_test[,-1]
+cred_test$Gender <- ifelse(cred_test$Gender == "Male", 1, 0)
+cred_test$Married <- ifelse(cred_test$Married == "Yes", 1, 0)
+levels(cred_test$Dependents)[5] <- 3
+cred_test$Education <- ifelse(cred_test$Education == "Graduate", 1, 0)
+cred_test$Self_Employed <- ifelse(cred_test$Self_Employed == "Yes", 1, 0)
+levels(cred_test$Property_Area)[1] <- 1 #rural
+levels(cred_test$Property_Area)[2] <- 2 #semi-urban
+levels(cred_test$Property_Area)[3] <- 3 #urban
+
+```
+
+
+```{r}
+cred_test$prob <- predict(cred_mod2, cred_test, type='response')
+cred_test$pred.class <- ifelse(cred_test$prob >= 0.50, 1, 0)
+# pander(head(cred_test, 10))
+write.csv(cred_test,"LoanPred_Eval.csv", row.names=FALSE)
+```
+
+\newpage
+
+## Discussion and Conclusions
+
+The finding of this study provides greater understanding into discovering what factors have signifcant impacts on predicting which borrower will likely to be approved for a loan based on their backround. The model also pointed out that gender is not a major factor for deciding who will get approved. It does make sense however, that education, income, martial status and credit history helps the financial institution in determing who they should loan money to. The model also included the borrower's living arrangement as significant too, that is, those who live in semi-urban neighborhoods. This concludes that folks with a responsible and financially stable background are likely to be approved for loan and are therefore a lower risk to the financial institution.
+
+
+
+## References
+
+
+Answers Ltd. (2020, January 15). Literature Review of Risks in Banking. Retrieved from https://ukdiss.com/litreview/literature-review-of-risks-in-banking-finance.php?vref=1
+
+Pandey, Vikas. “Test Preds.” Kaggle, 30 May 2017, www.kaggle.com/vikasp/loadpred.
+
+R, L. (2020). Logistic Regression Essentials in R - Articles - STHDA. Sthda.com. Retrieved 7 May 2020, from http://www.sthda.com/english/articles/36-classification-methods-essentials/151-logistic-regression-essentials-in-r/.
+
+Volkwein, J. F., & Szelest, B. P. (1995). Individual and campus characteristics associated with student loan default. Research in Higher Education, 36(1), 41-72. h
+
+Volkwein, J. F., Szelest, B. P., Cabrera, A. F., & Napierski-Prancl, M. R. (1998). Factors associated with student loan default among different racial and ethnic groups. The Journal of Higher Education, 69(2), 206. 
+
+Woo, Jennie H. (2002). Factors Affecting the Probability of Default: Student Loans in
+California. Journal of Student Financial Aid 32 (2): 5-25. 
+
+
+
+<!-- ### Appendices -->
+
+<!-- #### Predictions on Test Set -->
+
+<!-- ```{r} -->
+<!-- pander(head(cred_test, 10)) -->
+<!-- ``` -->
+
