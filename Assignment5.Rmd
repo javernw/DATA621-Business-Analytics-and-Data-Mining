@@ -1,10 +1,4 @@
 ---
-output:
-  pdf_document: default
-  html_document: default
----
-DATA621 Homework 5
----
 title: "DATA621 Homework 5"
 author: "Javern Wilson, Joseph Simone, Jack Russo, Paul Perez"
 date: "4/27/2020"
@@ -20,6 +14,7 @@ output:
       collapsed: yes
       smooth_scroll: yes
 ---
+
 **Overview**
 
 In this homework assignment, we will explore, analyze and model a data set containing information on approximately 12,000 commercially available wines. The variables are mostly related to the chemical properties of the wine being sold. The response variable is the number of sample cases of wine that were purchased by wine distribution companies after sampling a wine. These cases would be used to provide tasting samples to restaurants and wine stores around the United States. The more sample cases purchased, the more likely is a wine to be sold at a high end restaurant. A large wine manufacturer is studying the data in order to predict the number of wine cases ordered based upon the wine characteristics. If the wine manufacturer can predict the number of cases, then that manufacturer will be able to adjust their wine offering to maximize sales.
@@ -432,6 +427,17 @@ wine_eval2 %>% head(10) %>% as_tibble()
 write.csv(wine_eval, "wine_predictions2.csv", row.names = FALSE)
 ```
 
+
+## Appendices
+
+Source code: [GITHUB](https://github.com/javernw/DATA621-Business-Analytics-and-Data-Mining/blob/master/Assignment5.Rmd)
+
+
+Predictions:
+
+[Poission](https://github.com/javernw/DATA621-Business-Analytics-and-Data-Mining/blob/master/wine_predictions.csv)
+
+[Linear](https://github.com/javernw/DATA621-Business-Analytics-and-Data-Mining/blob/master/wine_predictions2.csv)
 
 
 
